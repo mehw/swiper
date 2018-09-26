@@ -1247,9 +1247,19 @@ See variable `ivy-recursive-restore' for further information."
             (funcall action x)
           (select-window (ivy--get-window ivy-last))
           (set-buffer (ivy-state-buffer ivy-last))
-          (prog1 (with-current-buffer (ivy-state-buffer ivy-last)
-                   (unwind-protect (funcall action x)
-                     (ivy-recursive-restore)))
+          (prog1
+              (let (res)
+                (prog1
+                    (with-current-buffer (ivy-state-buffer ivy-last)
+                      (unwind-protect (setq res (funcall action x))
+                        (ivy-recursive-restore)))
+                  ;; WORKAROUND: Override `with-current-buffer' if
+                  ;; switching buffer, otherwise the buffer is set
+                  ;; back to `ivy-last' registered old buffer, and
+                  ;; calling `current-buffer' soon after returns a
+                  ;; misleading result... the old buffer.
+                  (and (eq action #'ivy--switch-buffer-action)
+                       (bufferp res) (set-buffer res))))
             (unless (or (eq ivy-exit 'done)
                         (minibuffer-window-active-p (selected-window))
                         (null (active-minibuffer-window)))
